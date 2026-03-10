@@ -63,6 +63,9 @@ npm run compile
 npm run watch
 ```
 
+> [!WARNING]
+> This extension uses GitHub's internal API (`api.github.com/copilot_internal/user`) which is not officially documented. The API may change without notice, which could break this extension.
+
 ## License
 
 MIT
