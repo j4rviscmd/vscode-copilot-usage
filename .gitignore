@@ -4,3 +4,5 @@ out/
 *.vsix
 .vscode-test/
 .worktrees/
+.DS_Store
+CLAUDE.md
