@@ -31,3 +31,41 @@ percentage = (used / entitlement) * 100
 ```
 
 データソース: `quota_snapshots.premium_interactions`
+
+## リリース手順
+
+### 前提条件
+
+- Publisher `j4rviscmd` がVSCode Marketplaceに存在すること
+- GitHub Secret `VSCE_PAT` が設定されていること
+
+### リリースフロー
+
+1. **CHANGELOG.md の更新**（手動）
+   - **英語で記述すること**
+   - 新しいバージョンの変更内容を追記
+   - フォーマット:
+     ```markdown
+     ## [x.x.x] - YYYY-MM-DD
+
+     ### Added
+     - 新機能の説明
+
+     ### Fixed
+     - バグ修正の説明
+     ```
+
+2. **package.json のバージョン更新**
+   - `version` フィールドを更新
+
+3. **mainブランチへマージ**
+   - GitHub Actionsが自動的に実行:
+     - タグ作成（`vx.x.x`）
+     - VSCode Marketplaceへ公開
+     - GitHub Release作成（CHANGELOG.mdの内容を反映）
+
+### 注意事項
+
+- **CHANGELOG.md は手動更新必須** - workflowは読み取りのみ
+- **CHANGELOG.md は英語で記述** - 国際的なユーザー向け
+- 同一バージョンのタグが存在する場合はスキップされる

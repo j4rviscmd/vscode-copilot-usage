@@ -4,6 +4,8 @@
   "description": "Display GitHub Copilot Premium Requests usage in the status bar",
   "version": "0.0.1",
   "publisher": "j4rviscmd",
+  "license": "MIT",
+  "icon": "icon.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/j4rviscmd/vscode-copilot-usage.git"
@@ -12,7 +14,25 @@
     "vscode": "^1.85.0"
   },
   "categories": [
-    "Other"
+    "Programming Languages",
+    "Data Science"
+  ],
+  "keywords": [
+    "copilot",
+    "github copilot",
+    "copilot usage",
+    "premium requests",
+    "usage tracker",
+    "quota",
+    "status bar",
+    "metrics",
+    "monitoring",
+    "productivity",
+    "ai assistant",
+    "code assistant",
+    "usage statistics",
+    "copilot metrics",
+    "github"
   ],
   "activationEvents": [
     "onStartupFinished"
