@@ -2,7 +2,7 @@
   "name": "vscode-copilot-usage",
   "displayName": "VSCode Copilot Usage",
   "description": "Display GitHub Copilot Premium Requests usage in the status bar",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "publisher": "j4rviscmd",
   "license": "MIT",
   "icon": "icon.png",
