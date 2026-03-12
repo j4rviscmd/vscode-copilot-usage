@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fix screenshot image path in README to use `./` prefix for VSCode Marketplace display (#7)
 
+### Changed
+
+- Update extension icon (icon.png) with new design (#9)
+
 ## [0.1.0] - 2025-03-10
 
 ### Added
