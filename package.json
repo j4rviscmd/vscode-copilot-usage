@@ -39,6 +39,18 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "commands": [
+      {
+        "command": "copilotUsage.toggleLabelStyle",
+        "title": "Toggle Label Style (Icon/Text)",
+        "category": "Copilot Usage"
+      },
+      {
+        "command": "copilotUsage.setRefreshInterval",
+        "title": "Set Refresh Interval",
+        "category": "Copilot Usage"
+      }
+    ],
     "configuration": {
       "title": "Copilot Usage",
       "properties": {
@@ -46,6 +58,35 @@
           "type": "number",
           "default": 60,
           "description": "Data refresh interval in seconds (default: 60)"
+        },
+        "copilotUsage.labelStyle": {
+          "type": "string",
+          "default": "icon",
+          "enum": [
+            "icon",
+            "text"
+          ],
+          "enumDescriptions": [
+            "Display GitHub Copilot icon",
+            "Display 'Copilot' text"
+          ],
+          "description": "Label style for the status bar item"
+        }
+      }
+    },
+    "icons": {
+      "copilot-light": {
+        "description": "GitHub Copilot icon for light themes",
+        "default": {
+          "fontPath": "./assets/fonts/copilot-icons.woff",
+          "fontCharacter": "\\EA02"
+        }
+      },
+      "copilot-dark": {
+        "description": "GitHub Copilot icon for dark themes",
+        "default": {
+          "fontPath": "./assets/fonts/copilot-icons.woff",
+          "fontCharacter": "\\EA01"
         }
       }
     }
@@ -60,10 +101,11 @@
     "check": "biome check --write ./src",
     "check:ci": "biome check ./src"
   },
-  "devDependencies": {
+   "devDependencies": {
     "@biomejs/biome": "^2.4.6",
     "@types/node": "^20.10.0",
     "@types/vscode": "^1.85.0",
+    "svgtofont": "^6.5.1",
     "typescript": "^5.3.0"
   }
 }
