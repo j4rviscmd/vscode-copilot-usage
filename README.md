@@ -2,7 +2,7 @@
 
 # VSCode Copilot Usage
 
-![statusbar screenshot](<assets/screenshots/statusbar.png>)
+![statusbar screenshot](./assets/screenshots/statusbar.png)
 
 [![Latest Release](https://img.shields.io/github/v/release/j4rviscmd/vscode-copilot-usage?style=for-the-badge&color=green&label=Latest&logo=github&logoColor=white)](https://github.com/j4rviscmd/vscode-copilot-usage/releases/latest)
 [![Last Commit](https://img.shields.io/github/last-commit/j4rviscmd/vscode-copilot-usage/main?style=for-the-badge&color=1F6FEB&label=Last%20Update&logo=git&logoColor=white)](https://github.com/j4rviscmd/vscode-copilot-usage/commits/main)
