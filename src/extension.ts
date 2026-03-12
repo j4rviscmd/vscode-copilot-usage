@@ -78,7 +78,7 @@ export function activate(context: vscode.ExtensionContext) {
     100,
   );
   statusBarItem.command = undefined;
-  statusBarItem.text = "Copilot: ...";
+  statusBarItem.text = "Copilot: ..."; // Will be updated by updateStatusBar
   statusBarItem.show();
 
   function getCache(): CacheData | null {
@@ -197,12 +197,17 @@ export function activate(context: vscode.ExtensionContext) {
 
   async function updateStatusBar() {
     const { usage, apiCalled } = await fetchUsage();
+    const label = getLabel();
+    const style = getLabelStyle();
+
+    // Use colon only for text style
+    const separator = style === "text" ? ":" : "";
 
     if (usage === null) {
-      statusBarItem.text = "Copilot: -";
+      statusBarItem.text = `${label}${separator} -`;
       statusBarItem.tooltip = "Unable to fetch Copilot usage data";
     } else {
-      statusBarItem.text = `Copilot: ${usage.percentage}%`;
+      statusBarItem.text = `${label}${separator} ${usage.percentage}%`;
       statusBarItem.tooltip = `Premium Requests: ${usage.percentage}% (${usage.used}/${usage.entitlement})`;
     }
 
@@ -217,6 +222,25 @@ export function activate(context: vscode.ExtensionContext) {
     return seconds * 1000;
   }
 
+  function getLabelStyle(): "icon" | "text" {
+    const config = vscode.workspace.getConfiguration("copilotUsage");
+    return config.get<"icon" | "text">("labelStyle", "icon");
+  }
+
+  function isDarkTheme(): boolean {
+    const colorTheme = vscode.window.activeColorTheme;
+    return colorTheme.kind === vscode.ColorThemeKind.Dark;
+  }
+
+  function getLabel(): string {
+    const style = getLabelStyle();
+    if (style === "text") {
+      return "Copilot";
+    }
+    // Use custom icon based on theme
+    return isDarkTheme() ? "$(copilot-dark)" : "$(copilot-light)";
+  }
+
   let intervalId: ReturnType<typeof setInterval> | undefined;
 
   function startInterval() {
@@ -229,11 +253,64 @@ export function activate(context: vscode.ExtensionContext) {
   updateStatusBar();
   startInterval();
 
+  // Register commands
+  const toggleLabelStyleCommand = vscode.commands.registerCommand(
+    "copilotUsage.toggleLabelStyle",
+    async () => {
+      const currentStyle = getLabelStyle();
+      const newStyle = currentStyle === "icon" ? "text" : "icon";
+      const config = vscode.workspace.getConfiguration("copilotUsage");
+      await config.update("labelStyle", newStyle, vscode.ConfigurationTarget.Global);
+      vscode.window.showInformationMessage(
+        `Copilot Usage: Label style changed to "${newStyle}"`,
+      );
+    },
+  );
+
+  const setRefreshIntervalCommand = vscode.commands.registerCommand(
+    "copilotUsage.setRefreshInterval",
+    async () => {
+      const currentInterval = getRefreshInterval() / 1000;
+      const input = await vscode.window.showInputBox({
+        prompt: "Refresh interval in seconds",
+        value: String(currentInterval),
+        validateInput: (value) => {
+          const num = Number(value);
+          if (Number.isNaN(num) || num < 1) {
+            return "Please enter a positive number";
+          }
+          return null;
+        },
+      });
+      if (input !== undefined) {
+        const config = vscode.workspace.getConfiguration("copilotUsage");
+        await config.update(
+          "refreshInterval",
+          Number(input),
+          vscode.ConfigurationTarget.Global,
+        );
+        vscode.window.showInformationMessage(
+          `Copilot Usage: Refresh interval set to ${input} seconds`,
+        );
+      }
+    },
+  );
+
   context.subscriptions.push(
     statusBarItem,
+    toggleLabelStyleCommand,
+    setRefreshIntervalCommand,
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("copilotUsage.refreshInterval")) {
         startInterval();
+      }
+      if (e.affectsConfiguration("copilotUsage.labelStyle")) {
+        updateStatusBar();
+      }
+    }),
+    vscode.window.onDidChangeActiveColorTheme(() => {
+      if (getLabelStyle() === "icon") {
+        updateStatusBar();
       }
     }),
     {
