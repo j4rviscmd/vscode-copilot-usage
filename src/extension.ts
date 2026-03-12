@@ -260,7 +260,11 @@ export function activate(context: vscode.ExtensionContext) {
       const currentStyle = getLabelStyle();
       const newStyle = currentStyle === "icon" ? "text" : "icon";
       const config = vscode.workspace.getConfiguration("copilotUsage");
-      await config.update("labelStyle", newStyle, vscode.ConfigurationTarget.Global);
+      await config.update(
+        "labelStyle",
+        newStyle,
+        vscode.ConfigurationTarget.Global,
+      );
       vscode.window.showInformationMessage(
         `Copilot Usage: Label style changed to "${newStyle}"`,
       );
