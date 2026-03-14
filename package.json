@@ -71,6 +71,11 @@
             "Display 'Copilot' text"
           ],
           "description": "Label style for the status bar item"
+        },
+        "copilotUsage.statusBarPriority": {
+          "type": "number",
+          "default": -1000,
+          "description": "Priority of the Copilot Usage item in the status bar (higher = further left among right-aligned items). Change takes effect after reloading the window."
         }
       }
     },
