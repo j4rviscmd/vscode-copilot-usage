@@ -73,9 +73,13 @@ const CACHE_KEY = "copilotUsage.cache";
  * @param context - The extension context provided by VSCode.
  */
 export function activate(context: vscode.ExtensionContext) {
+  const priority = vscode.workspace
+    .getConfiguration("copilotUsage")
+    .get<number>("statusBarPriority", -1000);
+
   const statusBarItem = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Right,
-    100,
+    priority,
   );
   statusBarItem.command = undefined;
   statusBarItem.text = "Copilot: ..."; // Will be updated by updateStatusBar
@@ -310,6 +314,19 @@ export function activate(context: vscode.ExtensionContext) {
       }
       if (e.affectsConfiguration("copilotUsage.labelStyle")) {
         updateStatusBar();
+      }
+      if (e.affectsConfiguration("copilotUsage.statusBarPriority")) {
+        void (async () => {
+          const selection = await vscode.window.showInformationMessage(
+            "Copilot Usage: Status bar priority changed. Reload the window to apply.",
+            "Reload Window",
+          );
+          if (selection === "Reload Window") {
+            await vscode.commands.executeCommand(
+              "workbench.action.reloadWindow",
+            );
+          }
+        })();
       }
     }),
     vscode.window.onDidChangeActiveColorTheme(() => {
