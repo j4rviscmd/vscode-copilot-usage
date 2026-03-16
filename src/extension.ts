@@ -143,21 +143,16 @@ interface UsageData {
 /** Global state key for storing cached Copilot usage data. */
 const CACHE_KEY = "copilotUsage.cache";
 
-/**
- * Activates the extension.
- * @param context - The extension context provided by VSCode.
- */
-export function activate(context: vscode.ExtensionContext) {
-  const priority = vscode.workspace
-    .getConfiguration("copilotUsage")
-    .get<number>("statusBarPriority", -1000);
+export function activate(context: vscode.ExtensionContext): void {
+  const config = vscode.workspace.getConfiguration("copilotUsage");
+  const priority = config.get<number>("statusBarPriority", -1000);
 
   const statusBarItem = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Right,
     priority,
   );
   statusBarItem.command = undefined;
-  statusBarItem.text = "Copilot: ..."; // Will be updated by updateStatusBar
+  statusBarItem.text = "Copilot: ...";
   statusBarItem.show();
 
   /**
@@ -343,16 +338,27 @@ export function activate(context: vscode.ExtensionContext) {
     const { usage, apiCalled } = await fetchUsage();
     const label = getLabel();
     const style = getLabelStyle();
-
-    // Use colon only for text style
+    const displayMode = getDisplayMode();
     const separator = style === "text" ? ":" : "";
 
     if (usage === null) {
       statusBarItem.text = `${label}${separator} -`;
       statusBarItem.tooltip = "Unable to fetch Copilot usage data";
     } else {
-      statusBarItem.text = `${label}${separator} ${usage.percentage}%`;
-      statusBarItem.tooltip = `Premium Requests: ${usage.percentage}% (${usage.used}/${usage.entitlement})`;
+      let displayValue: number;
+      let tooltipText: string;
+
+      if (displayMode === "remaining") {
+        displayValue = Math.round((100 - usage.percentage) * 10) / 10;
+        const remaining = usage.entitlement - usage.used;
+        tooltipText = `Premium Requests: ${displayValue}% (remaining: ${remaining}/${usage.entitlement})`;
+      } else {
+        displayValue = usage.percentage;
+        tooltipText = `Premium Requests: ${usage.percentage}% (used: ${usage.used}/${usage.entitlement})`;
+      }
+
+      statusBarItem.text = `${label}${separator} ${displayValue}%`;
+      statusBarItem.tooltip = tooltipText;
     }
 
     if (apiCalled) {
@@ -366,9 +372,11 @@ export function activate(context: vscode.ExtensionContext) {
    * @returns The refresh interval in milliseconds.
    */
   function getRefreshInterval(): number {
-    const config = vscode.workspace.getConfiguration("copilotUsage");
-    const seconds = config.get<number>("refreshInterval", 60);
-    return seconds * 1000;
+    return config.get<number>("refreshInterval", 60) * 1000;
+  }
+
+  function getDisplayMode(): "used" | "remaining" {
+    return config.get<"used" | "remaining">("displayMode", "used");
   }
 
   /**
@@ -377,7 +385,6 @@ export function activate(context: vscode.ExtensionContext) {
    * @returns The label style: "icon" for Copilot icon, "text" for "Copilot" text.
    */
   function getLabelStyle(): "icon" | "text" {
-    const config = vscode.workspace.getConfiguration("copilotUsage");
     return config.get<"icon" | "text">("labelStyle", "icon");
   }
 
@@ -431,8 +438,7 @@ export function activate(context: vscode.ExtensionContext) {
   const toggleLabelStyleCommand = vscode.commands.registerCommand(
     "copilotUsage.toggleLabelStyle",
     async () => {
-      const currentStyle = getLabelStyle();
-      const newStyle = currentStyle === "icon" ? "text" : "icon";
+      const newStyle = getLabelStyle() === "icon" ? "text" : "icon";
       const config = vscode.workspace.getConfiguration("copilotUsage");
       await config.update(
         "labelStyle",
@@ -460,17 +466,36 @@ export function activate(context: vscode.ExtensionContext) {
           return null;
         },
       });
-      if (input !== undefined) {
-        const config = vscode.workspace.getConfiguration("copilotUsage");
-        await config.update(
-          "refreshInterval",
-          Number(input),
-          vscode.ConfigurationTarget.Global,
-        );
-        vscode.window.showInformationMessage(
-          `Copilot Usage: Refresh interval set to ${input} seconds`,
-        );
+      if (input === undefined) {
+        return;
       }
+      const config = vscode.workspace.getConfiguration("copilotUsage");
+      await config.update(
+        "refreshInterval",
+        Number(input),
+        vscode.ConfigurationTarget.Global,
+      );
+      vscode.window.showInformationMessage(
+        `Copilot Usage: Refresh interval set to ${input} seconds`,
+      );
+    },
+  );
+
+  const toggleDisplayModeCommand = vscode.commands.registerCommand(
+    "copilotUsage.toggleDisplayMode",
+    async () => {
+      const newMode = getDisplayMode() === "used" ? "remaining" : "used";
+      const config = vscode.workspace.getConfiguration("copilotUsage");
+      await config.update(
+        "displayMode",
+        newMode,
+        vscode.ConfigurationTarget.Global,
+      );
+      startInterval();
+      await updateStatusBar();
+      vscode.window.showInformationMessage(
+        `Copilot Usage: Display mode changed to "${newMode}"`,
+      );
     },
   );
 
@@ -478,42 +503,34 @@ export function activate(context: vscode.ExtensionContext) {
     statusBarItem,
     toggleLabelStyleCommand,
     setRefreshIntervalCommand,
-    vscode.workspace.onDidChangeConfiguration((e) => {
+    toggleDisplayModeCommand,
+    vscode.workspace.onDidChangeConfiguration(async (e) => {
       if (e.affectsConfiguration("copilotUsage.refreshInterval")) {
         startInterval();
       }
-      if (e.affectsConfiguration("copilotUsage.labelStyle")) {
+      if (
+        e.affectsConfiguration("copilotUsage.labelStyle") ||
+        e.affectsConfiguration("copilotUsage.displayMode")
+      ) {
         updateStatusBar();
       }
       if (e.affectsConfiguration("copilotUsage.statusBarPriority")) {
-        void (async () => {
-          const selection = await vscode.window.showInformationMessage(
-            "Copilot Usage: Status bar priority changed. Reload the window to apply.",
-            "Reload Window",
-          );
-          if (selection === "Reload Window") {
-            await vscode.commands.executeCommand(
-              "workbench.action.reloadWindow",
-            );
-          }
-        })();
+        const selection = await vscode.window.showInformationMessage(
+          "Copilot Usage: Status bar priority changed. Reload the window to apply.",
+          "Reload Window",
+        );
+        if (selection === "Reload Window") {
+          await vscode.commands.executeCommand("workbench.action.reloadWindow");
+        }
       }
     }),
     vscode.window.onDidChangeActiveColorTheme(() => {
-      if (getLabelStyle() === "icon") {
-        updateStatusBar();
-      }
+      if (getLabelStyle() === "icon") updateStatusBar();
     }),
-    {
-      dispose: () => {
-        if (intervalId !== undefined) clearInterval(intervalId);
-      },
-    },
+    { dispose: () => intervalId !== undefined && clearInterval(intervalId) },
   );
 }
 
-/**
- * Deactivates the extension.
- * Called when VSCode is shutting down or the extension is disabled.
- */
-export function deactivate() {}
+export function deactivate() {
+  // No cleanup needed
+}
