@@ -16,6 +16,7 @@
 
 - Displays Premium Requests usage percentage in the status bar
 - Configurable label style (icon or text)
+- Configurable display mode (used/remaining amount)
 - Configurable refresh interval
 - Automatic GitHub authentication
 
@@ -38,7 +39,9 @@ Install from VSCode Marketplace:
 | Setting | Type | Default | Description |
 | ------- | ---- | ------- | ----------- |
 | `copilotUsage.labelStyle` | string | `"icon"` | Label style: `"icon"` or `"text"` |
+| `copilotUsage.displayMode` | string | `"used"` | Display mode: `"used"` or `"remaining"` |
 | `copilotUsage.refreshInterval` | number | 60 | Data refresh interval in seconds |
+| `copilotUsage.statusBarPriority` | number | -1000 | Status bar display priority (higher = further left) |
 
 ## Usage
 
@@ -46,6 +49,12 @@ After installation, the extension will:
 1. Request GitHub authentication (if not already authenticated)
 2. Fetch your Copilot usage data
 3. Display the usage percentage in the status bar
+
+### Commands
+
+- `Copilot Usage: Toggle Label Style (Icon/Text)` - Switch between icon and text display
+- `Copilot Usage: Toggle Display Mode (Used/Remaining)` - Switch between used amount and remaining amount display
+- `Copilot Usage: Set Refresh Interval` - Change the data refresh interval
 
 ### Status Bar Display
 
