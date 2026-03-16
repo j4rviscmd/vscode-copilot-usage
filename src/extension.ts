@@ -215,31 +215,13 @@ export function activate(context: vscode.ExtensionContext) {
     const premiumInteractions = data.quota_snapshots?.premium_interactions;
 
     if (!premiumInteractions) {
-      console.log("[Copilot Usage] premium_interactions not found");
       return null;
     }
 
     const { entitlement, quota_remaining, percent_remaining } =
       premiumInteractions;
 
-    // Debug log for premium_interactions data
-    console.log(
-      "[Copilot Usage] premium_interactions:",
-      JSON.stringify(
-        {
-          entitlement,
-          quota_remaining,
-          percent_remaining: premiumInteractions.percent_remaining,
-          quota_reset_date: data.quota_reset_date,
-          quota_reset_date_utc: data.quota_reset_date_utc,
-        },
-        null,
-        2,
-      ),
-    );
-
     if (entitlement === 0) {
-      console.log("[Copilot Usage] entitlement is 0");
       return null;
     }
 
@@ -247,11 +229,6 @@ export function activate(context: vscode.ExtensionContext) {
     if (percent_remaining !== undefined && !Number.isNaN(percent_remaining)) {
       const percentage = 100 - percent_remaining;
       const used = Math.round((percentage / 100) * entitlement);
-      console.log("[Copilot Usage] Using API percent_remaining:", {
-        percent_remaining,
-        calculated_percentage: Math.round(percentage * 10) / 10,
-        calculated_used: used,
-      });
       return {
         percentage: Math.round(percentage * 10) / 10,
         used,
@@ -262,12 +239,6 @@ export function activate(context: vscode.ExtensionContext) {
     // Fallback to manual calculation
     const used = entitlement - quota_remaining;
     const percentage = (used / entitlement) * 100;
-
-    console.log("[Copilot Usage] Using fallback calculation:", {
-      used,
-      entitlement,
-      percentage: Math.round(percentage * 10) / 10,
-    });
 
     return {
       percentage: Math.round(percentage * 10) / 10,
@@ -318,11 +289,6 @@ export function activate(context: vscode.ExtensionContext) {
       }
 
       const data: CopilotApiResponse = await response.json();
-      // Debug log for API response
-      console.log(
-        "[Copilot Usage] API Response:",
-        JSON.stringify(data, null, 2),
-      );
       return data;
     } catch (error) {
       console.error("[Copilot Usage] Error:", error);
