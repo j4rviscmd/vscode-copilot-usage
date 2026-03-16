@@ -13,26 +13,12 @@
   "engines": {
     "vscode": "^1.85.0"
   },
-  "categories": [
-    "Programming Languages",
-    "Data Science"
-  ],
+  "categories": ["Other"],
   "keywords": [
     "copilot",
     "github copilot",
-    "copilot usage",
-    "premium requests",
-    "usage tracker",
     "quota",
-    "status bar",
-    "metrics",
-    "monitoring",
-    "productivity",
-    "ai assistant",
-    "code assistant",
-    "usage statistics",
-    "copilot metrics",
-    "github"
+    "status bar"
   ],
   "activationEvents": [
     "onStartupFinished"
@@ -48,6 +34,11 @@
       {
         "command": "copilotUsage.setRefreshInterval",
         "title": "Set Refresh Interval",
+        "category": "Copilot Usage"
+      },
+      {
+        "command": "copilotUsage.toggleDisplayMode",
+        "title": "Toggle Display Mode (Used/Remaining)",
         "category": "Copilot Usage"
       }
     ],
@@ -76,6 +67,19 @@
           "type": "number",
           "default": -1000,
           "description": "Priority of the Copilot Usage item in the status bar (higher = further left among right-aligned items). Change takes effect after reloading the window."
+        },
+        "copilotUsage.displayMode": {
+          "type": "string",
+          "default": "used",
+          "enum": [
+            "used",
+            "remaining"
+          ],
+          "enumDescriptions": [
+            "Display used usage amount (e.g., 50%)",
+            "Display remaining usage amount (e.g., 50% remaining)"
+          ],
+          "description": "Display mode for the usage amount"
         }
       }
     },
