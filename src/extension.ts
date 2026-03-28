@@ -143,9 +143,32 @@ interface UsageData {
 /** Global state key for storing cached Copilot usage data. */
 const CACHE_KEY = "copilotUsage.cache";
 
+/**
+ * Activates the Copilot Usage extension.
+ *
+ * Sets up a status bar item that displays the current GitHub Copilot premium
+ * request usage percentage. The extension periodically fetches usage data from
+ * the GitHub Copilot internal API, caches it in global state, and updates the
+ * status bar display. It also registers commands for toggling the label style,
+ * adjusting the refresh interval, and switching the display mode between used
+ * and remaining percentages.
+ *
+ * @param context - The VSCode extension context providing access to global state
+ *   and subscription management.
+ */
 export function activate(context: vscode.ExtensionContext): void {
-  const config = vscode.workspace.getConfiguration("copilotUsage");
-  const priority = config.get<number>("statusBarPriority", -1000);
+  /**
+   * Retrieves the current Copilot usage configuration.
+   *
+   * Re-fetches on every call to avoid stale values after runtime changes.
+   *
+   * @returns The current workspace configuration for the "copilotUsage" section.
+   */
+  function getConfig(): vscode.WorkspaceConfiguration {
+    return vscode.workspace.getConfiguration("copilotUsage");
+  }
+
+  const priority = getConfig().get<number>("statusBarPriority", -1000);
 
   const statusBarItem = vscode.window.createStatusBarItem(
     vscode.StatusBarAlignment.Right,
@@ -372,11 +395,16 @@ export function activate(context: vscode.ExtensionContext): void {
    * @returns The refresh interval in milliseconds.
    */
   function getRefreshInterval(): number {
-    return config.get<number>("refreshInterval", 60) * 1000;
+    return getConfig().get<number>("refreshInterval", 60) * 1000;
   }
 
+  /**
+   * Retrieves the configured display mode for usage data.
+   *
+   * @returns The display mode: "used" shows consumed percentage, "remaining" shows leftover percentage.
+   */
   function getDisplayMode(): "used" | "remaining" {
-    return config.get<"used" | "remaining">("displayMode", "used");
+    return getConfig().get<"used" | "remaining">("displayMode", "used");
   }
 
   /**
@@ -385,7 +413,7 @@ export function activate(context: vscode.ExtensionContext): void {
    * @returns The label style: "icon" for Copilot icon, "text" for "Copilot" text.
    */
   function getLabelStyle(): "icon" | "text" {
-    return config.get<"icon" | "text">("labelStyle", "icon");
+    return getConfig().get<"icon" | "text">("labelStyle", "icon");
   }
 
   /**
@@ -531,6 +559,12 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 }
 
+/**
+ * Deactivates the Copilot Usage extension.
+ *
+ * Cleanup is handled automatically via disposables registered in `context.subscriptions`
+ * during activation, so no additional teardown is required here.
+ */
 export function deactivate() {
   // No cleanup needed
 }
