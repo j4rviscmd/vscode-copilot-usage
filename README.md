@@ -50,6 +50,15 @@ After installation, the extension will:
 2. Fetch your Copilot usage data
 3. Display the usage percentage in the status bar
 
+### PAT Authentication
+
+You can use a Personal Access Token (PAT) instead of OAuth:
+
+1. Create a PAT at [GitHub Settings > Developer settings > Personal access tokens](https://github.com/settings/tokens)
+2. Select **Classic** token type
+3. Select the `read:user` scope (this is the only required scope)
+4. Run the `Copilot Usage: Set Personal Access Token` command and enter your token
+
 ### Commands
 
 - `Copilot Usage: Toggle Label Style (Icon/Text)` - Switch between icon and text display
