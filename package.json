@@ -40,6 +40,16 @@
         "command": "copilotUsage.toggleDisplayMode",
         "title": "Toggle Display Mode (Used/Remaining)",
         "category": "Copilot Usage"
+      },
+      {
+        "command": "copilotUsage.setPat",
+        "title": "Set PAT",
+        "category": "Copilot Usage"
+      },
+      {
+        "command": "copilotUsage.clearPat",
+        "title": "Clear PAT",
+        "category": "Copilot Usage"
       }
     ],
     "configuration": {

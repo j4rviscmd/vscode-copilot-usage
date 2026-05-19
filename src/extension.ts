@@ -142,6 +142,8 @@ interface UsageData {
 
 /** Global state key for storing cached Copilot usage data. */
 const CACHE_KEY = "copilotUsage.cache";
+/** Key used to store the PAT in VSCode SecretStorage. */
+const PAT_SECRET = "copilotUsage.pat";
 
 /**
  * Activates the Copilot Usage extension.
@@ -174,7 +176,6 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.StatusBarAlignment.Right,
     priority,
   );
-  statusBarItem.command = undefined;
   statusBarItem.text = "Copilot: ...";
   statusBarItem.show();
 
@@ -243,20 +244,18 @@ export function activate(context: vscode.ExtensionContext): void {
       return null;
     }
 
+    let used: number;
+    let percentage: number;
+
     // Use API's percent_remaining if available and valid
     if (percent_remaining !== undefined && !Number.isNaN(percent_remaining)) {
-      const percentage = 100 - percent_remaining;
-      const used = Math.round((percentage / 100) * entitlement);
-      return {
-        percentage: Math.round(percentage * 10) / 10,
-        used,
-        entitlement,
-      };
+      percentage = 100 - percent_remaining;
+      used = Math.round((percentage / 100) * entitlement);
+    } else {
+      // Fallback to manual calculation
+      used = entitlement - quota_remaining;
+      percentage = (used / entitlement) * 100;
     }
-
-    // Fallback to manual calculation
-    const used = entitlement - quota_remaining;
-    const percentage = (used / entitlement) * 100;
 
     return {
       percentage: Math.round(percentage * 10) / 10,
@@ -266,32 +265,20 @@ export function activate(context: vscode.ExtensionContext): void {
   }
 
   /**
-   * Fetches Copilot usage data from the GitHub internal API.
+   * Fetches Copilot usage data from the GitHub internal API using the given token.
    *
-   * This function authenticates using GitHub authentication, then calls the
-   * copilot_internal/user endpoint to retrieve quota and usage information.
-   *
-   * @returns The API response data, or null if authentication fails or an error occurs.
+   * @param token - Bearer token (PAT or OAuth access token).
+   * @returns The API response data, or null on failure.
    */
-  async function fetchFromApi(): Promise<CopilotApiResponse | null> {
+  async function fetchFromApi(
+    token: string,
+  ): Promise<CopilotApiResponse | null> {
     try {
-      const session = await vscode.authentication.getSession(
-        "github",
-        ["user:email"],
-        {
-          createIfNone: true,
-        },
-      );
-
-      if (!session) {
-        return null;
-      }
-
       const response = await fetch(
         "https://api.github.com/copilot_internal/user",
         {
           headers: {
-            Authorization: `Bearer ${session.accessToken}`,
+            Authorization: `Bearer ${token}`,
             "User-Agent": "VSCode-Copilot-Usage-Extension",
           },
         },
@@ -306,8 +293,7 @@ export function activate(context: vscode.ExtensionContext): void {
         return null;
       }
 
-      const data: CopilotApiResponse = await response.json();
-      return data;
+      return (await response.json()) as CopilotApiResponse;
     } catch (error) {
       console.error("[Copilot Usage] Error:", error);
       return null;
@@ -315,39 +301,96 @@ export function activate(context: vscode.ExtensionContext): void {
   }
 
   /**
-   * Fetches usage data with intelligent caching.
+   * Fetches usage data with intelligent caching and PAT/OAuth fallback.
    *
-   * This function implements a multi-tier strategy:
+   * Resolution order:
    * 1. Returns valid cached data if available
-   * 2. Fetches fresh data from API if cache is invalid
-   * 3. Falls back to expired cache if API call fails
-   * 4. Returns null if no data is available
+   * 2. Tries PAT (from SecretStorage) → API call
+   * 3. Falls back to GitHub OAuth session → API call
+   * 4. Falls back to expired cache if API call fails
+   * 5. Returns noAuth when no credential is available
    *
-   * @returns An object containing the usage data (or null) and whether an API call was made.
+   * @returns An object containing the usage data (or null), whether an API call was made,
+   *   whether no credential is available, and the account login.
    */
   async function fetchUsage(): Promise<{
     usage: UsageData | null;
     apiCalled: boolean;
+    noAuth: boolean;
+    login: string | null;
   }> {
     const cache = getCache();
 
     if (cache && isCacheValid(cache)) {
-      return { usage: extractUsageData(cache.data), apiCalled: false };
+      return {
+        usage: extractUsageData(cache.data),
+        apiCalled: false,
+        noAuth: false,
+        login: cache.data.login ?? null,
+      };
     }
 
-    const apiData = await fetchFromApi();
+    // Try PAT first
+    const pat = await context.secrets.get(PAT_SECRET);
+    let apiData: CopilotApiResponse | null = null;
+    let hasOAuthSession = false;
+
+    if (pat) {
+      apiData = await fetchFromApi(pat);
+    } else {
+      // Fallback to GitHub OAuth (don't auto-prompt)
+      const session = await vscode.authentication.getSession(
+        "github",
+        ["user:email"],
+        { createIfNone: false },
+      );
+      if (session) {
+        hasOAuthSession = true;
+        apiData = await fetchFromApi(session.accessToken);
+      }
+    }
 
     if (apiData) {
       setCache(apiData);
-      return { usage: extractUsageData(apiData), apiCalled: true };
+      return {
+        usage: extractUsageData(apiData),
+        apiCalled: true,
+        noAuth: false,
+        login: apiData.login ?? null,
+      };
     }
 
     // Fallback to expired cache if API fails
     if (cache) {
-      return { usage: extractUsageData(cache.data), apiCalled: false };
+      return {
+        usage: extractUsageData(cache.data),
+        apiCalled: false,
+        noAuth: false,
+        login: cache.data.login ?? null,
+      };
     }
 
-    return { usage: null, apiCalled: false };
+    // No PAT and no OAuth session
+    return {
+      usage: null,
+      apiCalled: false,
+      noAuth: !pat && !hasOAuthSession,
+      login: null,
+    };
+  }
+
+  /**
+   * Configures the status bar item to reflect the "no auth" state.
+   *
+   * Shows "Set PAT" and attaches the setPat command so clicking opens the input prompt.
+   */
+  function applyNoAuthState(): void {
+    const label = getLabel();
+    const style = getLabelStyle();
+    const separator = style === "text" ? ":" : "";
+    statusBarItem.command = "copilotUsage.setPat";
+    statusBarItem.text = `${label}${separator} Set PAT`;
+    statusBarItem.tooltip = "Click to set your GitHub Personal Access Token";
   }
 
   /**
@@ -358,26 +401,35 @@ export function activate(context: vscode.ExtensionContext): void {
    * it also resets the refresh timer to ensure proper interval timing.
    */
   async function updateStatusBar() {
-    const { usage, apiCalled } = await fetchUsage();
+    const { usage, apiCalled, noAuth, login } = await fetchUsage();
     const label = getLabel();
     const style = getLabelStyle();
     const displayMode = getDisplayMode();
     const separator = style === "text" ? ":" : "";
 
-    if (usage === null) {
+    if (noAuth) {
+      applyNoAuthState();
+      if (intervalId !== undefined) {
+        clearInterval(intervalId);
+        intervalId = undefined;
+      }
+    } else if (usage === null) {
+      statusBarItem.command = undefined;
       statusBarItem.text = `${label}${separator} -`;
       statusBarItem.tooltip = "Unable to fetch Copilot usage data";
     } else {
+      statusBarItem.command = undefined;
       let displayValue: number;
       let tooltipText: string;
+      const accountInfo = login ? ` (${login})` : "";
 
       if (displayMode === "remaining") {
         displayValue = Math.round((100 - usage.percentage) * 10) / 10;
         const remaining = usage.entitlement - usage.used;
-        tooltipText = `Premium Requests: ${displayValue}% (remaining: ${remaining}/${usage.entitlement})`;
+        tooltipText = `Premium Requests: ${displayValue}% (remaining: ${remaining}/${usage.entitlement})${accountInfo}`;
       } else {
         displayValue = usage.percentage;
-        tooltipText = `Premium Requests: ${usage.percentage}% (used: ${usage.used}/${usage.entitlement})`;
+        tooltipText = `Premium Requests: ${usage.percentage}% (used: ${usage.used}/${usage.entitlement})${accountInfo}`;
       }
 
       statusBarItem.text = `${label}${separator} ${displayValue}%`;
@@ -467,8 +519,7 @@ export function activate(context: vscode.ExtensionContext): void {
     "copilotUsage.toggleLabelStyle",
     async () => {
       const newStyle = getLabelStyle() === "icon" ? "text" : "icon";
-      const config = vscode.workspace.getConfiguration("copilotUsage");
-      await config.update(
+      await getConfig().update(
         "labelStyle",
         newStyle,
         vscode.ConfigurationTarget.Global,
@@ -497,8 +548,7 @@ export function activate(context: vscode.ExtensionContext): void {
       if (input === undefined) {
         return;
       }
-      const config = vscode.workspace.getConfiguration("copilotUsage");
-      await config.update(
+      await getConfig().update(
         "refreshInterval",
         Number(input),
         vscode.ConfigurationTarget.Global,
@@ -513,8 +563,7 @@ export function activate(context: vscode.ExtensionContext): void {
     "copilotUsage.toggleDisplayMode",
     async () => {
       const newMode = getDisplayMode() === "used" ? "remaining" : "used";
-      const config = vscode.workspace.getConfiguration("copilotUsage");
-      await config.update(
+      await getConfig().update(
         "displayMode",
         newMode,
         vscode.ConfigurationTarget.Global,
@@ -527,11 +576,61 @@ export function activate(context: vscode.ExtensionContext): void {
     },
   );
 
+  const setPatCmd = vscode.commands.registerCommand(
+    "copilotUsage.setPat",
+    async () => {
+      const pat = await vscode.window.showInputBox({
+        prompt: "Enter your GitHub Personal Access Token",
+        placeHolder: "ghp_...",
+        password: true,
+        ignoreFocusOut: true,
+      });
+
+      if (!pat) {
+        return;
+      }
+
+      const label = getLabel();
+      statusBarItem.text = `${label} Verifying...`;
+      const result = await fetchFromApi(pat);
+
+      if (result === null) {
+        await context.secrets.delete(PAT_SECRET);
+        await context.globalState.update(CACHE_KEY, undefined);
+        vscode.window.showErrorMessage(
+          "Copilot Usage: Failed to verify PAT. Please check the token and try again.",
+        );
+        await updateStatusBar();
+        return;
+      }
+
+      await context.secrets.store(PAT_SECRET, pat);
+      setCache(result);
+      vscode.window.showInformationMessage(
+        "Copilot Usage: PAT saved successfully.",
+      );
+      await updateStatusBar();
+      startInterval();
+    },
+  );
+
+  const clearPatCmd = vscode.commands.registerCommand(
+    "copilotUsage.clearPat",
+    async () => {
+      await context.secrets.delete(PAT_SECRET);
+      await context.globalState.update(CACHE_KEY, undefined);
+      await updateStatusBar();
+      vscode.window.showInformationMessage("Copilot Usage: PAT cleared.");
+    },
+  );
+
   context.subscriptions.push(
     statusBarItem,
     toggleLabelStyleCommand,
     setRefreshIntervalCommand,
     toggleDisplayModeCommand,
+    setPatCmd,
+    clearPatCmd,
     vscode.workspace.onDidChangeConfiguration(async (e) => {
       if (e.affectsConfiguration("copilotUsage.refreshInterval")) {
         startInterval();
