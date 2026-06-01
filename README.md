@@ -1,3 +1,8 @@
+> [!WARNING]
+> **Archived Project**<br/>
+> GitHub Copilot transitioned from request-based billing to token-based billing on June 1, 2026.<br/>
+> I consider this change a downgrade and have cancelled my subscription, so this extension is now archived and will no longer be maintained.
+
 <div align="center">
 
 # VSCode Copilot Usage
